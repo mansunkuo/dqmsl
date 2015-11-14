@@ -3,6 +3,7 @@ library(rvest)
 library(stringr)
 library(RCurl)
 library(data.table)
+library(XML)
 
 ranking_pages = read_html("http://dqmsl-search.net/ranking/allsbjstatus?hide=&hides=,star1,star2,star3,star4")
 urls_xpath = "/html/body/div[@class='mainh']/div[@class='mainc']/div[@class='ccol']/div[@class='mbox'][2]/div[@class='mboxb']/div/div[@class='innnerHideDiv']/div/div/a"
@@ -13,9 +14,32 @@ monster_urls = ranking_pages %>%
     unique() %>%
     (function(x) {paste0(base_url, x, sep = "")}) 
 
+# download html files
+dir_name = "html"
+dir.create(dir_name, showWarnings = FALSE)
+file_names = str_replace_all(monster_urls, ".*\\?", "") %>%
+    (function(x){paste(dir_name, "/", x, ".html", sep = "")})
+for (i in 1:length(monster_urls)) {
+    message(i)
+    download.file(monster_urls[i], file_names[i])
+    Sys.sleep(rpois(1, 1)+1)
+    
+    monster_page = read_html(file_names[i])
+    icon_url = monster_page %>%
+        html_nodes(xpath = "/html/body/div[@class='mainh']/div[@class='mainc']/div[@class='ccol']/div[@class='mbox'][1]/div[@class='mboxh']/img[@id='msIcn']") %>%
+        html_attr(name = "src") 
+    download.file(sprintf("%s%s", base_url, icon_url), 
+                  gsub("^\\/", "", icon_url))
+    Sys.sleep(rpois(1, 1)+1)
+}
+
 monsters = data.table()
-for (monster_url in monster_urls) {
-    monster_page = read_html(monster_url)
+# for (monster_url in monster_urls) {
+# for (monster_url in monster_urls[1]) {
+for (i in 1:length(file_names)) {
+    # monster_page = read_html(monster_url)
+    print(i)
+    monster_page = read_html(file_names[i])
     id = str_extract(monster_url, "[0-9]*$")
     
     name = monster_page %>%
@@ -23,11 +47,11 @@ for (monster_url in monster_urls) {
         html_text() %>%
         (function(x) {gsub("-.*-$", "", x)})
     
-    icon_url = monster_page %>%
-        html_nodes(xpath = "/html/body/div[@class='mainh']/div[@class='mainc']/div[@class='ccol']/div[@class='mbox'][1]/div[@class='mboxh']/img[@id='msIcn']") %>%
-        html_attr(name = "src") 
-    download.file(sprintf("%s%s", base_url, icon_url), 
-                  gsub("^\\/", "", icon_url))
+#     icon_url = monster_page %>%
+#         html_nodes(xpath = "/html/body/div[@class='mainh']/div[@class='mainc']/div[@class='ccol']/div[@class='mbox'][1]/div[@class='mboxh']/img[@id='msIcn']") %>%
+#         html_attr(name = "src") 
+#     download.file(sprintf("%s%s", base_url, icon_url), 
+#                   gsub("^\\/", "", icon_url))
     
     mrank = monster_page %>%
         html_nodes(xpath = "//span[@id='maxChartId']") %>%
