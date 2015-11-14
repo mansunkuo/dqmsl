@@ -5,13 +5,17 @@ sudo: required
 
 # System dependencies for HTTP calling
 apt_packages:
- - libcurl4-openssl-dev
- - libxml2-dev
-#r_binary_packages:
-# - RUnit
-# - testthat
-r_packages:
-    - rmarkdown
+    - libcurl4-gnutls-dev 
+    - libxml2-dev 
+    - libssl-dev
+    #- libcurl4-openssl-dev
+    #- libxml2-dev
+    
+ 
+r_binary_packages:
+    - devtools
+    - RUnit
+    - testthat
     - testthat
     - rvest
     - stringr
