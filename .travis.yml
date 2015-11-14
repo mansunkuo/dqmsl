@@ -8,12 +8,12 @@ apt_packages:
     - libcurl4-gnutls-dev 
     - libxml2-dev 
     - libssl-dev
-    #- libcurl4-openssl-dev
+    - libcurl4-openssl-dev
     #- libxml2-dev
-    
+r_github_packages:
+    - hadley/devtools    
  
 r_binary_packages:
-    - devtools
     - RUnit
     - testthat
     - testthat
@@ -22,6 +22,8 @@ r_binary_packages:
     - data.table
     - googleVis
     - ca
+
+
 
 # Install the bleeding edge version of a package from github (eg to pick
 # up a not-yet-released bugfix)
