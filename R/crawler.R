@@ -19,28 +19,30 @@ dir_name = "html"
 dir.create(dir_name, showWarnings = FALSE)
 file_names = str_replace_all(monster_urls, ".*\\?", "") %>%
     (function(x){paste(dir_name, "/", x, ".html", sep = "")})
-for (i in 1:length(monster_urls)) {
-    message(i)
-    download.file(monster_urls[i], file_names[i])
-    Sys.sleep(rpois(1, 1)+1)
-    
-    monster_page = read_html(file_names[i])
-    icon_url = monster_page %>%
-        html_nodes(xpath = "/html/body/div[@class='mainh']/div[@class='mainc']/div[@class='ccol']/div[@class='mbox'][1]/div[@class='mboxh']/img[@id='msIcn']") %>%
-        html_attr(name = "src") 
-    download.file(sprintf("%s%s", base_url, icon_url), 
-                  gsub("^\\/", "", icon_url))
-    Sys.sleep(rpois(1, 1)+1)
-}
+# for (i in 1:length(monster_urls)) {
+#     message(i)
+#     download.file(monster_urls[i], file_names[i])
+#     Sys.sleep(rpois(1, 1)+1)
+#     
+#     monster_page = read_html(file_names[i])
+#     icon_url = monster_page %>%
+#         html_nodes(xpath = "/html/body/div[@class='mainh']/div[@class='mainc']/div[@class='ccol']/div[@class='mbox'][1]/div[@class='mboxh']/img[@id='msIcn']") %>%
+#         html_attr(name = "src") 
+#     download.file(sprintf("%s%s", base_url, icon_url), 
+#                   gsub("^\\/", "", icon_url))
+#     Sys.sleep(rpois(1, 1)+1)
+# }
+
 
 monsters = data.table()
 # for (monster_url in monster_urls) {
 # for (monster_url in monster_urls[1]) {
+file_names = list.files("html", pattern = ".*no.*", full.names = TRUE)
 for (i in 1:length(file_names)) {
     # monster_page = read_html(monster_url)
     print(i)
     monster_page = read_html(file_names[i])
-    id = str_extract(monster_url, "[0-9]*$")
+    id = str_extract(file_names[i], "[0-9]+")
     
     name = monster_page %>%
         html_nodes(xpath = "/html/body/div[@class='mainh']/div[@class='mainc']/div[@class='ccol']/div[@class='mbox'][1]/div[@class='mboxh']/h1") %>%
@@ -132,7 +134,54 @@ for (i in 1:length(file_names)) {
                          like = like,
                          hate = hate)        
     monsters = rbind(monsters, monster)
-    Sys.sleep(rpois(1, 1))
 }
 
 write.csv(monsters, "data/monsters.csv", row.names = FALSE)
+
+
+# skills
+skill_file = paste(dir_name, "/skills.html", sep = "")
+download.file("http://dqmsl-search.net/picturebook/skill", skill_file)
+skill_pages = read_html(skill_file)
+skills = data.table()
+for (i in 1:6) {
+    skill_types = skill_pages %>%
+        html_nodes(xpath = sprintf("/html/body/div[@class='mainh']/div[@class='mainc']/div[@class='ccol']/div[@class='mbox'][2]/div[@class='mboxb'][%s]/div[*]/span[@class='srchead']/span", i)) %>%
+        html_text()
+    print(skill_types)
+    for (j in 1:length(skill_types)) {
+        print(sprintf("##########%s##########", skill_types[j]))
+        if (i == 1) {
+            skill_vec = skill_pages %>%
+                html_nodes(xpath = sprintf("/html/body/div[@class='mainh']/div[@class='mainc']/div[@class='ccol']/div[@class='mbox'][2]/div[@class='mboxb'][1]/div[2]/div[@class='innnerHideDiv1']/div[*]/span[@class='srchead']/span")) %>%
+                html_text()
+        } else {
+            skill_vec = skill_pages %>%
+                html_nodes(xpath = sprintf("/html/body/div[@class='mainh']/div[@class='mainc']/div[@class='ccol']/div[@class='mbox'][2]/div[@class='mboxb'][%s]/div[%s]/div[@class='innnerHideDiv1']/div[*]/span[@class='srchead']/span", i, j)) %>%
+                html_text()
+        }
+        
+        print(skill_vec)
+        for (k in 1:length(skill_vec)) {
+            print(sprintf("##########%s##########", skill_vec[k]))
+            if (i ==1) {
+                monsters = skill_pages %>%
+                    html_nodes(xpath = sprintf("/html/body/div[@class='mainh']/div[@class='mainc']/div[@class='ccol']/div[@class='mbox'][2]/div[@class='mboxb'][1]/div[2]/div[@class='innnerHideDiv1']/div[%s]/div[@class='innnerHideDiv2']/div[2]/div[@class='innnerHideDiv4']/div[*]/span", k)) %>%
+                    html_text()
+            } else {
+                monsters = skill_pages %>%
+                    html_nodes(xpath = sprintf("/html/body/div[@class='mainh']/div[@class='mainc']/div[@class='ccol']/div[@class='mbox'][2]/div[@class='mboxb'][%s]/div[%s]/div[@class='innnerHideDiv1']/div[%s]/div[@class='innnerHideDiv2']/div[2]/div[@class='innnerHideDiv4']/div[*]/span", i, j, k)) %>%
+                    html_text()
+            }
+            print(monsters)
+            if (length(monsters > 0)) {
+                temp_dt = data.table(skill_type = skill_types[j],
+                                     skill = skill_vec[k],
+                                     monster = monsters)
+                skills = rbind(skills, temp_dt)
+            }
+        }
+    }
+}
+
+write.csv(skills, "data/skills.csv", row.names = FALSE)

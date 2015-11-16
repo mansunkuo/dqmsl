@@ -67,6 +67,7 @@ library(stringr)
 library(data.table)
 library(googleVis)
 library(ca)
+library(proxy)
 ```
 
 
@@ -105,6 +106,7 @@ monsters[, name := sprintf("<a href='http://dqmsl-search.net/monster/detail?no=%
                            id, name)]
 monsters[, `:=`(like_percent = like / view * 100, 
                 hate_percent = hate / view * 100)]
+monsters = monsters[order(total, decreasing = TRUE),]
 ```
 
 
@@ -121,7 +123,7 @@ print(mtable, "chart")
 
 ```{r}
 print_bar = function(dt, colname, height = 400, width = 900) {
-    percent = monsters[, .(percent = .N), by = colname][
+    percent = dt[, .(percent = .N), by = colname][
         , percent := percent / sum(percent) * 100]
     print(gvisBarChart(percent, options = list(height = height, width = width)), 
           "chart")
@@ -191,6 +193,21 @@ ca_plot = gvisScatterChart(ca_dt, options = list(width = 500, height = 500,
 
 ## Correspondence analysis - 2
 
+<div class="code_block">
+
+The total variance of the data matrix is measured by the inertia, which ressembles a chi-square statistic 
+but is calculated on relative observed and expected frequencies.
+
+<img src="img/inertia.PNG">
+
+```{r}
+cafit
+```
+
+</div>
+
+## Correspondence analysis - 3
+
 ```{r results='asis'}
 print(ca_plot, "chart")
 ```
@@ -218,9 +235,9 @@ print(ftable(rank ~ weight, data = monsters))
 ```
 
 
-## Multidimensional scaling
+## Classical Multidimensional scaling
 
-Here we choose SS monsters to find distaance of monsters via hp, mp, str, def, agi and int.
+Here we choose SS monsters to find distance of monsters via hp, mp, str, def, agi and int.
 
 ```{r results='asis'}
 body_cols = c("hp", "mp", "str", "def", "agi", "int")
@@ -240,8 +257,23 @@ plot_out = gvisScatterChart(plot_dt, options=list(tooltip="{isHtml:'true'}",
                                                   legend = '{"position": "none"}'))
 ```
 
+## Classical Multidimensional scaling - 2
 
-## Multidimensional scaling - 2
+GOF measures the goodness of fit of Multidimensional scaling
+
+g.i = (sum{j=1..k} λ[j]) / (sum{j=1..n} T.i(λ[j])), 
+where:
+
+- λ[j] are the eigenvalues (sorted in decreasing order)
+- T.1(v) = abs(v) 
+- T.2(v) = max(v, 0)
+
+```{r}
+fit$GOF
+```
+
+
+## Classical Multidimensional scaling - 3
 
 ```{r results='asis'}
 print(plot_out, "chart")
@@ -272,6 +304,127 @@ print(plot_out, "chart")
 ```
 
 
+## Skills of monsters
+
+Skills of monsters can be found in 
+[this page](http://dqmsl-search.net/picturebook/skill).
+
+```{r results='asis'}
+skills = fread("data/skills.csv")
+skills[, skill_mp := str_replace_all(skill, "^.*\\(消費MP:|\\)$", "")]
+# skills[, skillasd := str_replace_all(skill, "\\(消費MP:.*\\)|\\W", "")]
+skills = suppressWarnings(merge(skills, 
+               monsters[, .(monster = gsub("<a href=\\'.*\\'>|</a>", "", 
+                                           monsters$name), rank, name, icon)],
+               by = "monster", all.x = TRUE, all.y = FALSE))
+stable = gvisTable(skills, options = list(page = "enable",
+                                          pageSize = 5))
+```
+
+
+## Skills Table
+
+```{r results='asis'}
+print(stable, "chart")
+```
+
+
+## Skills type
+
+```{r results='asis'}
+print_bar(skills, "skill_type")
+```
+
+
+## Most common skills
+
+```{r results='asis'}
+skill_count = skills[, .(count = .N), by = "skill"][order(-count)]
+sctable = gvisTable(skill_count, options = list(page = "enable",
+                                               pageSize = 10))
+print(sctable, "chart")
+```
+
+
+## Multidimensional scaling via skill
+
+
+```{r results='asis'}
+ss_skills = copy(skills[rank %in% c("SS"),])
+monster_skill = table(ss_skills$monster, ss_skills$skill)
+skills_dist = dist(monster_skill, method = "jaccard")
+ss_skills_dist = dist(monster_skill, method = "jaccard")
+
+fit = cmdscale(ss_skills_dist, eig = TRUE, k=2)
+plot_dt = data.table(Dim1 = fit$points[,1],
+                     Dim2 = fit$points[,2],
+                     Dim2.html.tooltip = ss$icon)
+
+plot_out = gvisScatterChart(plot_dt, options=list(tooltip="{isHtml:'true'}",
+                                                  width = 500, height = 500, 
+                                                  legend = '{"position": "none"}'))
+```
+
+
+## Multidimensional scaling via skill - 2
+
+<div class="code_block">
+
+The GOF is only around `r round(mean(fit$GOF), 2)`.
+
+```{r}
+fit$GOF
+```
+
+</div>
+
+## Multidimensional scaling via skill - 3
+
+```{r results='asis'}
+print(plot_out, "chart")
+```
+
+
+## Correspondence analysis via skill
+
+```{r}
+ss_skills = copy(skills[rank %in% c("SS"),])
+monster_skill = table(ss_skills$monster, ss_skills$skill)
+cafit = ca(monster_skill)
+ca_dt = rbind(data.table(Dim1 = cafit$rowcoord[, 1], 
+                         system = cafit$rowcoord[, 2],
+                         system.html.tooltip = rownames(monster_skill), 
+                         type = rep(NA, nrow(monster_skill)),
+                         type.html.tooltip = rep(NA, nrow(monster_skill))),
+              data.table(Dim1 = cafit$colcoord[, 1], 
+                         system = rep(NA, ncol(monster_skill)),
+                         system.html.tooltip = rep(NA, ncol(monster_skill)),
+                         type = cafit$colcoord[, 2],
+                         type.html.tooltip = colnames(monster_skill)))
+tick_str = "{'ticks': [-5, -4, -3, -2, -1, 0, 1, 2] }"
+ca_plot = gvisScatterChart(ca_dt, options = list(width = 500, height = 500,
+                                                 hAxis = tick_str, vAxis = tick_str))
+```
+
+## Correspondence analysis via skill - 2 
+
+<div class="code_block">
+
+The principal inertias is very low.
+
+```{r}
+cafit
+```
+
+</div>
+
+## Correspondence analysis via skill - 3
+
+```{r results='asis'}
+print(ca_plot, "chart")
+```
+
+
 ## 最後
 
 <div class="columns-2">
@@ -280,6 +433,8 @@ print(plot_out, "chart")
 
 - [iOS](https://itunes.apple.com/us/app/yong-zhe-dou-e-long-guai-wu/id942902540?l=zh&ls=1&mt=8)
 - [Android](https://play.google.com/store/apps/details?id=net.gamon.dqmslTW)
+
+<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>
 
 <img src="img/id.jpg", height=700>
 
