@@ -200,6 +200,10 @@ but is calculated on relative observed and expected frequencies.
 
 <img src="img/inertia.PNG">
 
+The cummulative percentage of inertia of two dimension is about
+`r round(sum(round(cafit$sv^2, 6)[1:2]) / sum(round(cafit$sv^2, 6)) * 100)`
+%.
+
 ```{r}
 cafit
 ```
@@ -312,10 +316,9 @@ Skills of monsters can be found in
 ```{r results='asis'}
 skills = fread("data/skills.csv")
 skills[, skill_mp := str_replace_all(skill, "^.*\\(消費MP:|\\)$", "")]
-# skills[, skillasd := str_replace_all(skill, "\\(消費MP:.*\\)|\\W", "")]
 skills = suppressWarnings(merge(skills, 
                monsters[, .(monster = gsub("<a href=\\'.*\\'>|</a>", "", 
-                                           monsters$name), rank, name, icon)],
+                                           monsters$name), rank, name, system, icon)],
                by = "monster", all.x = TRUE, all.y = FALSE))
 stable = gvisTable(skills, options = list(page = "enable",
                                           pageSize = 5))
@@ -346,12 +349,12 @@ print(sctable, "chart")
 ```
 
 
-## Multidimensional scaling via skill
+## Classical Multidimensional scaling via skill
 
 
 ```{r results='asis'}
 ss_skills = copy(skills[rank %in% c("SS"),])
-monster_skill = table(ss_skills$monster, ss_skills$skill)
+monster_skill = table(ss_skills$monster, ss_skills$skill_type)
 skills_dist = dist(monster_skill, method = "jaccard")
 ss_skills_dist = dist(monster_skill, method = "jaccard")
 
@@ -359,18 +362,17 @@ fit = cmdscale(ss_skills_dist, eig = TRUE, k=2)
 plot_dt = data.table(Dim1 = fit$points[,1],
                      Dim2 = fit$points[,2],
                      Dim2.html.tooltip = ss$icon)
-
 plot_out = gvisScatterChart(plot_dt, options=list(tooltip="{isHtml:'true'}",
                                                   width = 500, height = 500, 
                                                   legend = '{"position": "none"}'))
 ```
 
 
-## Multidimensional scaling via skill - 2
+## Classical Multidimensional scaling via skill - 2
 
 <div class="code_block">
 
-The GOF is only around `r round(mean(fit$GOF), 2)`.
+The GOF is around `r round(max(fit$GOF), 2)`.
 
 ```{r}
 fit$GOF
@@ -378,7 +380,7 @@ fit$GOF
 
 </div>
 
-## Multidimensional scaling via skill - 3
+## Classical Multidimensional scaling via skill - 3
 
 ```{r results='asis'}
 print(plot_out, "chart")
@@ -389,18 +391,18 @@ print(plot_out, "chart")
 
 ```{r}
 ss_skills = copy(skills[rank %in% c("SS"),])
-monster_skill = table(ss_skills$monster, ss_skills$skill)
+monster_skill = table(ss_skills$system, ss_skills$skill_type)
 cafit = ca(monster_skill)
 ca_dt = rbind(data.table(Dim1 = cafit$rowcoord[, 1], 
                          system = cafit$rowcoord[, 2],
                          system.html.tooltip = rownames(monster_skill), 
-                         type = rep(NA, nrow(monster_skill)),
-                         type.html.tooltip = rep(NA, nrow(monster_skill))),
+                         skilltype = rep(NA, nrow(monster_skill)),
+                         skilltype.html.tooltip = rep(NA, nrow(monster_skill))),
               data.table(Dim1 = cafit$colcoord[, 1], 
                          system = rep(NA, ncol(monster_skill)),
                          system.html.tooltip = rep(NA, ncol(monster_skill)),
-                         type = cafit$colcoord[, 2],
-                         type.html.tooltip = colnames(monster_skill)))
+                         skilltype = cafit$colcoord[, 2],
+                         skilltype.html.tooltip = colnames(monster_skill)))
 tick_str = "{'ticks': [-5, -4, -3, -2, -1, 0, 1, 2] }"
 ca_plot = gvisScatterChart(ca_dt, options = list(width = 500, height = 500,
                                                  hAxis = tick_str, vAxis = tick_str))
@@ -410,13 +412,16 @@ ca_plot = gvisScatterChart(ca_dt, options = list(width = 500, height = 500,
 
 <div class="code_block">
 
-The principal inertias is very low.
+The cummulative percentage of inertia of two dimension is about
+`r round(sum(round(cafit$sv^2, 6)[1:2]) / sum(round(cafit$sv^2, 6)) * 100)`
+%.
 
 ```{r}
 cafit
 ```
 
 </div>
+
 
 ## Correspondence analysis via skill - 3
 
